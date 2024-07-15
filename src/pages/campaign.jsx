@@ -10,6 +10,8 @@ import { Footer } from "@/widgets/layout";
 import { sendUSDT, fetchUSDTBalance, getUSDTContract } from '../utils/walletActions';
 import { ethers } from 'ethers';
 import { useAccount, useWalletClient, useSendTransaction, } from 'wagmi';
+import axios from 'axios';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 export function Campaign({ wagmiClient }) {
   const { id } = useParams();
@@ -18,8 +20,8 @@ export function Campaign({ wagmiClient }) {
   const [value, setValue] = useState("");
   const [balance, setBalance] = useState(0);
   const [campainDetail, setcampainDetail] = useState([]);
-
-
+  const [transactions, setTransactions] = useState([]);
+  const walletAddress = "0xb3216ae6c979dec5fa318117305efd23181db8bb";
 
   // const provider = useProvider();
   useEffect(() => {
@@ -32,6 +34,7 @@ export function Campaign({ wagmiClient }) {
 
   }, [isConnected, walletClient])
 
+  //Campaign Detail
   useEffect(() => {
     const fetchcampainDetail = async () => {
       try {
@@ -51,6 +54,42 @@ export function Campaign({ wagmiClient }) {
     };
     fetchcampainDetail();
   }, []);
+
+  //Transaction history
+  useEffect(() => {
+    const apiUrl = "https://api.bscscan.com/api";
+    const params = {
+      module: "account",
+      action: "tokentx",
+      contractaddress: "0x55d398326f99059ff775485246999027b3197955",
+      address: walletAddress, // Thay YOUR_WALLET_ADDRESS bằng địa chỉ ví của bạn
+      page: 1,
+      offset: 100,
+      startblock : 0,
+      endblock: 999999999,
+      sort: "desc",
+      apikey: "TBQWJWW3GUYJWGQ9W9U446QTRJXHSAJKQH" // Thay YOUR_API_KEY bằng API key của bạn
+    };
+
+    axios.get(apiUrl, { params })
+      .then(response => {
+        if (response.data.status === "1") {
+          const filteredTransactions = response.data.result.filter(transaction => transaction.to.toLowerCase() === walletAddress.toLowerCase());
+          setTransactions(filteredTransactions);
+        } else {
+          setError(response.data.message);
+        }
+        setLoading(false);
+      })
+      .catch(error => {
+        setError(error.message);
+        setLoading(false);
+      });
+  }, [walletAddress]);
+
+  const maskAddress = (address) => {
+    return address.substring(0, 10) + "........" + address.substring(address.length - 10);
+  };
 
   const loadBalance = async () => {
     // if(!isConnected) return false;
@@ -253,6 +292,39 @@ export function Campaign({ wagmiClient }) {
                 <p dangerouslySetInnerHTML={{ __html: campainDetail.content }}>
                 </p>
               </div>
+            </div>
+
+            <div className="container mt-5">
+              <Typography
+                variant="h3"
+                className="mb-3 font-bold"
+                color="blue-gray"
+              >
+                Transaction History
+              </Typography>
+              <table className="table table-striped">
+                <thead>
+                  <tr>
+                  <th scope="col">Hash</th>
+                    <th scope="col">From Address</th>
+                    <th scope="col">To Address</th>
+                    <th scope="col">Value (USDT)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map(transaction => {
+                    const valueInUSDT = transaction.value / Math.pow(10, transaction.tokenDecimal);
+                    return (
+                      <tr key={transaction.hash}>
+                        <td>{transaction.hash}</td>
+                        <td>{maskAddress(transaction.from)}</td>
+                        <td>{maskAddress(transaction.to)}</td>
+                        <td>{valueInUSDT} {transaction.tokenSymbol}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
 
